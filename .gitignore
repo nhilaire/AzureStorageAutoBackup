@@ -6,3 +6,6 @@
 /src/obj
 /src/.vs/AzureStorageAutoBackup
 /src/bin/Debug/net5.0
+/tests/AzureStorageAutoBackup.Tests/bin/Debug/net5.0
+/tests/AzureStorageAutoBackup.Tests/obj
+/src/appsettings.Development.json

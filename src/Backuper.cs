@@ -3,7 +3,6 @@ using AzureStorageAutoBackup.Files;
 using AzureStorageAutoBackup.State;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace AzureStorageAutoBackup
@@ -27,18 +26,13 @@ namespace AzureStorageAutoBackup
         {
             try
             {
+                await _filesState.Load();
+
                 var fileListToBackup = await _filesBuilder.GetFileListToBackup();
 
                 _logger.LogTrace($"Nb files to backup : {fileListToBackup.Count}");
 
-                await _filesState.Load();
-                var alreadyBackupedFiles = _filesState.CompletedFiles;
-
-                var effectivesFilesToBackup = GetFilesToBackup(fileListToBackup, alreadyBackupedFiles);
-
-                _logger.LogTrace($"Nb files to upload : {effectivesFilesToBackup.Count}");
-
-                var filesInStorage = await _fileUploader.UploadIfNeeded(effectivesFilesToBackup);
+                var filesInStorage = await _fileUploader.UploadIfNeeded(fileListToBackup);
                 await _fileUploader.CleanFilesAndDirectories(filesInStorage, fileListToBackup);
 
                 _logger.LogTrace("End ...");
@@ -47,11 +41,6 @@ namespace AzureStorageAutoBackup
             {
                 _logger.LogError(ex, "An error occured during the backup");
             }
-        }
-
-        private List<FileItem> GetFilesToBackup(List<FileItem> filesToBackup, List<FileItem> alreadyBackupedFiles)
-        {
-            return FileItemComparer.GetFilesIntersection(filesToBackup, alreadyBackupedFiles);
         }
     }
 }

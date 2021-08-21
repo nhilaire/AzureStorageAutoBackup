@@ -9,3 +9,5 @@
 /tests/AzureStorageAutoBackup.Tests/bin/Debug/net5.0
 /tests/AzureStorageAutoBackup.Tests/obj
 /src/appsettings.Development.json
+/src/bin
+/tests/AzureStorageAutoBackup.Tests/bin/Release/net5.0

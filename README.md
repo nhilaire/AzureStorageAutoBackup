@@ -25,3 +25,11 @@ ConnectionString should be the connection string of azure file share founded in 
   }
 }
 ```
+
+## Point of interests
+* Using azure storage api via HTTPS (instead of using smb volume, because port 445 can be blocked)
+* Files no more presents in hard drive but existing on storage are deleted (synchronisation)
+* I'm using my own metadata on files instead of using existing MD5 property because I've seen the MD5 calculation changed on storage, so all files needs to be reuploaded ...
+* DeleteEmptyDirectoriesIfExist can probably be optimized to avoid browsing 2 times the storage
+* Before, I use the md5.exe tool to improve the performance of MD5 calculation. But I don't want to use an external tool anymore. So now, MD5 calculation is slow. This should be improved too.
+* I'm using Windows, so the namimg convention is based on windows (c:\...), but this can be easily adapted to work on other systems

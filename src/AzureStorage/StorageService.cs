@@ -52,42 +52,32 @@ namespace AzureStorageAutoBackup.AzureStorage
             }
         }
 
-        public async Task UploadToStorage(List<FileItem> files)
+        public async Task UploadToStorage(FileItem file)
         {
-            if (files.Count == 0)
-            {
-                return;
-            }
+            var baseDirectory = _shareClient.GetDirectoryClient(_appConfiguration.DestinationPathInAzure);
+            var azurePath = ToAzureNameWithoutBasePath(file.Path);
+            var fileClient = baseDirectory.GetFileClient(azurePath);
 
-            await _shareClient.CreateIfNotExistsAsync();
-            if (await _shareClient.ExistsAsync())
+
+            using (var stream = File.OpenRead(file.Path))
             {
-                var baseDirectory = _shareClient.GetDirectoryClient(_appConfiguration.DestinationPathInAzure);
-                await baseDirectory.CreateIfNotExistsAsync();
-                if (await baseDirectory.ExistsAsync())
-                {
-                    foreach (var file in files)
-                    {
-                        var azurePath = ToAzureNameWithoutBasePath(file.Path);
-                        var fileClient = baseDirectory.GetFileClient(azurePath);
-                        using (var stream = File.OpenRead(file.Path))
-                        {
-                            fileClient.Create(stream.Length);
-                            await UploadFileAsync(fileClient, stream, $"{file.Path} : {file.State}");
-                        }
-                        var metadata = new Dictionary<string, string>
-                        {
-                            {customChecksumMetadataName, file.Checksum}
-                        };
-                        await fileClient.SetMetadataAsync(metadata);
-                        await _filesState.Save(file);
-                    }
-                }
+                fileClient.Create(stream.Length);
+                await UploadFileAsync(fileClient, stream, $"{file.Path} : {file.State}");
             }
+            var metadata = new Dictionary<string, string>
+            {
+                {customChecksumMetadataName, file.Checksum}
+            };
+            await fileClient.SetMetadataAsync(metadata);
+            await _filesState.Save(file);
         }
 
         private async Task UploadFileAsync(ShareFileClient fileClient, Stream stream, string fileNameAndState)
         {
+            if (stream.Length == 0)
+            {
+                return;
+            }
             const int uploadLimit = 4 * 1024 * 1024;
 
             long index = 0;
@@ -199,7 +189,11 @@ namespace AzureStorageAutoBackup.AzureStorage
                     var fileClient = directoryClient.GetFileClient(item.Name);
                     var properties = await fileClient.GetPropertiesAsync();
                     properties.Value.Metadata.TryGetValue(customChecksumMetadataName, out var checksum);
-                    result.Add(FileItem.Create(ToWindowsName(directoryClient.Path, item.Name), checksum));
+                    result.Add(new FileItem
+                    {
+                        Path = ToWindowsName(directoryClient.Path, item.Name),
+                        Checksum = checksum
+                    });
                 }
             }
         }

@@ -6,6 +6,7 @@ namespace AzureStorageAutoBackup.Tests.Stubs
 {
     public class FakeFilesState : IFilesState
     {
+        public int Count { get; private set; }
         private List<FileItem> _completedFiles;
         public List<FileItem> CompletedFiles => _completedFiles;
 
@@ -30,7 +31,8 @@ namespace AzureStorageAutoBackup.Tests.Stubs
 
         public Task Save(FileItem file)
         {
-            throw new System.NotImplementedException();
+            Count++;
+            return Task.CompletedTask;
         }
     }
 }

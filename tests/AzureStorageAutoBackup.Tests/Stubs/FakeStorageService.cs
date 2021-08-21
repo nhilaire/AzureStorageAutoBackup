@@ -7,6 +7,8 @@ namespace AzureStorageAutoBackup.Tests.Stubs
 {
     public class FakeStorageService : IStorageReader, IStorageCommand
     {
+        public int Count { get; private set; } = 0;
+
         public Task<List<FileItem>> BrowseStorage()
         {
             return Task.FromResult(new List<FileItem>
@@ -36,9 +38,9 @@ namespace AzureStorageAutoBackup.Tests.Stubs
             return Task.CompletedTask;
         }
 
-        public Task UploadToStorage(List<FileItem> files)
+        public Task UploadToStorage(FileItem file)
         {
-            files.Count.Should().Be(10);
+            Count++;
             return Task.CompletedTask;
         }
     }

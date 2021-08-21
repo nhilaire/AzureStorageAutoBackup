@@ -6,7 +6,7 @@ namespace AzureStorageAutoBackup.AzureStorage
     public interface IStorageCommand
     {
         Task CreateDirectories(List<string> directories);
-        Task UploadToStorage(List<FileItem> files);
+        Task UploadToStorage(FileItem file);
         Task DeleteFiles(List<string> filesToDelete);
         Task DeleteEmptyDirectoriesIfExist();
     }

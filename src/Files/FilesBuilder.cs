@@ -1,10 +1,7 @@
-﻿using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Concurrent;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Security.Cryptography;
 using System.Threading.Tasks;
 
 namespace AzureStorageAutoBackup.Files
@@ -13,16 +10,19 @@ namespace AzureStorageAutoBackup.Files
     {
         private readonly AppConfiguration _appConfiguration;
         private readonly IFileReader _fileReader;
+        private readonly ILogger<FilesBuilder> _logger;
 
-        public FilesBuilder(IOptions<AppConfiguration> appConfiguration, IFileReader fileReader)
+        public FilesBuilder(IOptions<AppConfiguration> appConfiguration, IFileReader fileReader, ILogger<FilesBuilder> logger)
         {
             _appConfiguration = appConfiguration.Value;
             _fileReader = fileReader;
+            _logger = logger;
         }
 
         public async Task<List<FileItem>> GetFileListToBackup()
         {
             var result = new List<FileItem>();
+            _logger.LogTrace("Browsing files, please wait ...");
             var files = await _fileReader.ReadAllFiles(_appConfiguration.Paths);
             foreach (var currentFile in files)
             {
@@ -32,13 +32,7 @@ namespace AzureStorageAutoBackup.Files
                 }
             }
 
-            var concurrentResult = new ConcurrentBag<FileItem>();
-            Parallel.ForEach(result, file =>
-            {
-                concurrentResult.Add(FileItem.Create(file.Path, CalculateMD5(file.Path)));
-            });
-
-            return concurrentResult.ToList();
+            return result;
         }
 
         private bool IsExcludedPath(string file)
@@ -56,14 +50,5 @@ namespace AzureStorageAutoBackup.Files
             }
             return false;
         }
-
-        private string CalculateMD5(string filename)
-        {
-            using var md5 = MD5.Create();
-            using var stream = _fileReader.OpenRead(filename);
-            var hash = md5.ComputeHash(stream);
-            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-        }
     }
-
 }

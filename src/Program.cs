@@ -30,6 +30,7 @@ namespace AzureStorageAutoBackup
                 services.AddHttpClient();
                 services.Configure<AppConfiguration>(configuration.GetSection("AppConfiguration"));
                 services.AddSingleton<IFilesState, FilesState>();
+                services.AddTransient<Md5>();
                 services.AddTransient<IFileReader, FileReader>();
                 services.AddTransient<FilesBuilder>();
                 services.AddTransient<FileUploader>();

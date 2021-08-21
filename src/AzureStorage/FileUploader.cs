@@ -1,4 +1,5 @@
-﻿using AzureStorageAutoBackup.State;
+﻿using AzureStorageAutoBackup.Files;
+using AzureStorageAutoBackup.State;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.IO;
@@ -13,39 +14,46 @@ namespace AzureStorageAutoBackup.AzureStorage
         private readonly IStorageCommand _storageCommand;
         private readonly IFilesState _filesState;
         private readonly ILogger<FileUploader> _logger;
+        private readonly Md5 _md5;
 
-        public FileUploader(IStorageReader storageReader, IStorageCommand storageCommand, IFilesState filesState, ILogger<FileUploader> logger)
+        public FileUploader(IStorageReader storageReader, IStorageCommand storageCommand, IFilesState filesState, ILogger<FileUploader> logger, Md5 md5)
         {
             _storageReader = storageReader;
             _storageCommand = storageCommand;
             _filesState = filesState;
             _logger = logger;
+            _md5 = md5;
         }
 
         public async Task<List<FileItem>> UploadIfNeeded(List<FileItem> files)
         {
+            _logger.LogTrace("Reading actual storage ...");
             var existingFiles = await _storageReader.BrowseStorage();
 
             if (files.Count > 0)
             {
                 var missingDirectories = ComputeMissingDirectories(files, existingFiles);
 
-                _logger.LogTrace($"Nb directories to create : {missingDirectories.Count}");
-
+                _logger.LogTrace($"Nb directories to create in storage : {missingDirectories.Count}");
                 await _storageCommand.CreateDirectories(missingDirectories);
 
-                var effectivesFiles = FileItemComparer.GetFilesIntersection(files, existingFiles);
-                if (effectivesFiles.Count == 0)
+                var alreadyBackupedFiles = _filesState.CompletedFiles;
+
+                foreach (var file in files)
                 {
-                    foreach (var allreadyInStorage in files)
+                    file.Checksum = _md5.CalculateMD5(file.Path);
+                    if (!file.ExistsIn(alreadyBackupedFiles))
                     {
-                        await _filesState.Save(allreadyInStorage);
+                        if (!file.ExistsIn(existingFiles))
+                        {
+                            await _storageCommand.UploadToStorage(file);
+                        }
+                        else
+                        {
+                            await _filesState.Save(file);
+                        }
                     }
                 }
-
-                _logger.LogTrace($"Nb files to upload effectively : {effectivesFiles.Count}");
-
-                await _storageCommand.UploadToStorage(effectivesFiles);
             }
 
             return existingFiles;

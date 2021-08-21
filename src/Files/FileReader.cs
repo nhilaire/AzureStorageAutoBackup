@@ -1,4 +1,5 @@
 ﻿using MoreLinq;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,12 +22,30 @@ namespace AzureStorageAutoBackup.Files
 
         private async Task BrowseFiles(string path, List<FileItem> result)
         {
-            foreach (var file in Directory.GetFiles(path))
+            var files = new string[0];
+            try
             {
-                result.Add(FileItem.Create(file));
+                files = Directory.GetFiles(path);
+            }
+            catch (UnauthorizedAccessException)
+            {
             }
 
-            foreach (var directory in Directory.GetDirectories(path))
+            foreach (var file in files)
+            {
+                result.Add(new FileItem { Path = file });
+            }
+
+            var directories = new string[0];
+            try
+            {
+                directories = Directory.GetDirectories(path);
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+            
+            foreach (var directory in directories)
             {
                 await BrowseFiles(directory, result);
             }

@@ -11,7 +11,7 @@ namespace AzureStorageAutoBackup.Tests.Stubs
     {
         public Task<List<FileItem>> ReadAllFiles(List<string> basePath)
         {
-            return Task.FromResult(GetFakeFiles().Select(x => FileItem.Create(x)).ToList());
+            return Task.FromResult(GetFakeFiles().Select(x => new FileItem { Path = x }).ToList());
         }
 
         public Stream OpenRead(string fileName)

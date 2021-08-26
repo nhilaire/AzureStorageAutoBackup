@@ -19,13 +19,15 @@ namespace AzureStorageAutoBackup.AzureStorage
         private readonly ShareClient _shareClient;
         private readonly IFilesState _filesState;
         private readonly ILogger<StorageService> _logger;
+        private readonly ApplicationStat _applicationStat;
 
-        public StorageService(IOptions<AppConfiguration> appConfiguration, IFilesState filesState, ILogger<StorageService> logger)
+        public StorageService(IOptions<AppConfiguration> appConfiguration, IFilesState filesState, ILogger<StorageService> logger, ApplicationStat applicationStat)
         {
             _appConfiguration = appConfiguration.Value;
             _shareClient = new ShareClient(_appConfiguration.ConnectionString, _appConfiguration.ShareReference);
             _filesState = filesState;
             _logger = logger;
+            _applicationStat = applicationStat;
         }
 
         public async Task CreateDirectories(List<string> directories)
@@ -57,7 +59,6 @@ namespace AzureStorageAutoBackup.AzureStorage
             var baseDirectory = _shareClient.GetDirectoryClient(_appConfiguration.DestinationPathInAzure);
             var azurePath = ToAzureNameWithoutBasePath(file.Path);
             var fileClient = baseDirectory.GetFileClient(azurePath);
-
 
             using (var stream = File.OpenRead(file.Path))
             {
@@ -117,6 +118,7 @@ namespace AzureStorageAutoBackup.AzureStorage
             foreach (var file in filesToDelete)
             {
                 var path = ToAzureNameWithoutBasePath(file);
+                _applicationStat.DeleteFilesCount++;
                 _logger.LogTrace($"Delete from azure storage {path}");
                 await baseDirectory.DeleteFileAsync(path);
                 await _filesState.Delete(file);

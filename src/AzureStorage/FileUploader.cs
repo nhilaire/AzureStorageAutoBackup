@@ -15,14 +15,16 @@ namespace AzureStorageAutoBackup.AzureStorage
         private readonly IFilesState _filesState;
         private readonly ILogger<FileUploader> _logger;
         private readonly Md5 _md5;
+        private readonly ApplicationStat _applicationStat;
 
-        public FileUploader(IStorageReader storageReader, IStorageCommand storageCommand, IFilesState filesState, ILogger<FileUploader> logger, Md5 md5)
+        public FileUploader(IStorageReader storageReader, IStorageCommand storageCommand, IFilesState filesState, ILogger<FileUploader> logger, Md5 md5, ApplicationStat applicationStat)
         {
             _storageReader = storageReader;
             _storageCommand = storageCommand;
             _filesState = filesState;
             _logger = logger;
             _md5 = md5;
+            _applicationStat = applicationStat;
         }
 
         public async Task<List<FileItem>> UploadIfNeeded(List<FileItem> files)
@@ -33,8 +35,9 @@ namespace AzureStorageAutoBackup.AzureStorage
             if (files.Count > 0)
             {
                 var missingDirectories = ComputeMissingDirectories(files, existingFiles);
+                _applicationStat.MissingDirectoriesCount = missingDirectories.Count;
 
-                _logger.LogTrace($"Nb directories to create in storage : {missingDirectories.Count}");
+                _logger.LogTrace($"Nb directories to create in storage : {_applicationStat.MissingDirectoriesCount}");
                 await _storageCommand.CreateDirectories(missingDirectories);
 
                 var alreadyBackupedFiles = _filesState.CompletedFiles;
@@ -42,15 +45,29 @@ namespace AzureStorageAutoBackup.AzureStorage
                 foreach (var file in files)
                 {
                     file.Checksum = _md5.CalculateMD5(file.Path);
-                    if (!file.ExistsIn(alreadyBackupedFiles))
+                    if (file.ExistsIn(alreadyBackupedFiles))
                     {
-                        if (!file.ExistsIn(existingFiles))
+                        _applicationStat.AlreadyBackupedCount++;
+                    }
+                    else
+                    {
+                        if (file.ExistsIn(existingFiles))
                         {
-                            await _storageCommand.UploadToStorage(file);
+                            _applicationStat.AlreadyBackupedCount++;
+                            await _filesState.Save(file);
                         }
                         else
                         {
-                            await _filesState.Save(file);
+                            if (file.State == FileState.New)
+                            {
+                                _applicationStat.NewFilesCount++;
+                            }
+                            else
+                            {
+                                _applicationStat.UpdateFilesCount++;
+                            }
+
+                            await _storageCommand.UploadToStorage(file);
                         }
                     }
                 }

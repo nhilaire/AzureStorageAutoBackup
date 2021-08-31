@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AzureStorageAutoBackup.AzureStorage
@@ -27,10 +28,10 @@ namespace AzureStorageAutoBackup.AzureStorage
             _applicationStat = applicationStat;
         }
 
-        public async Task<List<FileItem>> UploadIfNeeded(List<FileItem> files)
+        public async Task<List<FileItem>> UploadIfNeeded(List<FileItem> files, CancellationTokenSource cancellationToken)
         {
             _logger.LogTrace("Reading actual storage ...");
-            var existingFiles = await _storageReader.BrowseStorage();
+            var existingFiles = await _storageReader.BrowseStorage(cancellationToken);
 
             if (files.Count > 0)
             {
@@ -38,37 +39,49 @@ namespace AzureStorageAutoBackup.AzureStorage
                 _applicationStat.MissingDirectoriesCount = missingDirectories.Count;
 
                 _logger.LogTrace($"Nb directories to create in storage : {_applicationStat.MissingDirectoriesCount}");
-                await _storageCommand.CreateDirectories(missingDirectories);
+                await _storageCommand.CreateDirectories(missingDirectories, cancellationToken);
 
                 var alreadyBackupedFiles = _filesState.CompletedFiles;
 
                 foreach (var file in files)
                 {
-                    file.Checksum = _md5.CalculateMD5(file.Path);
-                    if (file.ExistsIn(alreadyBackupedFiles))
+                    if (cancellationToken.IsCancellationRequested)
                     {
-                        _applicationStat.AlreadyBackupedCount++;
+                        return existingFiles;
                     }
-                    else
+
+                    try
                     {
-                        if (file.ExistsIn(existingFiles))
+                        file.Checksum = _md5.CalculateMD5(file.Path);
+                        if (file.ExistsIn(alreadyBackupedFiles))
                         {
                             _applicationStat.AlreadyBackupedCount++;
-                            await _filesState.Save(file);
                         }
                         else
                         {
-                            if (file.State == FileState.New)
+                            if (file.ExistsIn(existingFiles))
                             {
-                                _applicationStat.NewFilesCount++;
+                                _applicationStat.AlreadyBackupedCount++;
+                                await _filesState.Save(file);
                             }
                             else
                             {
-                                _applicationStat.UpdateFilesCount++;
-                            }
+                                if (file.State == FileState.New)
+                                {
+                                    _applicationStat.NewFilesCount++;
+                                }
+                                else
+                                {
+                                    _applicationStat.UpdateFilesCount++;
+                                }
 
-                            await _storageCommand.UploadToStorage(file);
+                                await _storageCommand.UploadToStorage(file, cancellationToken);
+                            }
                         }
+                    }
+                    catch (IOException)
+                    {
+                        _applicationStat.FilesInErrors.Add(file.Path);
                     }
                 }
             }
@@ -76,13 +89,13 @@ namespace AzureStorageAutoBackup.AzureStorage
             return existingFiles;
         }
 
-        public async Task CleanFilesAndDirectories(List<FileItem> filesInStorage, List<FileItem> fileListToBackup)
+        public async Task CleanFilesAndDirectories(List<FileItem> filesInStorage, List<FileItem> fileListToBackup, CancellationTokenSource cancellationToken)
         {
             var filesToDeleteInStorage = filesInStorage.Select(x => x.Path).Except(fileListToBackup.Select(x => x.Path)).ToList();
             _logger.LogTrace($"Nb files to delete in storage : {filesToDeleteInStorage.Count}");
-            await _storageCommand.DeleteFiles(filesToDeleteInStorage);
+            await _storageCommand.DeleteFiles(filesToDeleteInStorage, cancellationToken);
 
-            await _storageCommand.DeleteEmptyDirectoriesIfExist();
+            await _storageCommand.DeleteEmptyDirectoriesIfExist(cancellationToken);
         }
 
         private static List<string> ComputeMissingDirectories(List<FileItem> files, List<FileItem> existingFiles)

@@ -1,9 +1,12 @@
 ﻿using AzureStorageAutoBackup.AzureStorage;
 using AzureStorageAutoBackup.Files;
+using AzureStorageAutoBackup.Mail;
 using AzureStorageAutoBackup.State;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AzureStorageAutoBackup
@@ -12,9 +15,18 @@ namespace AzureStorageAutoBackup
     {
         static async Task Main(string[] args)
         {
+            var cancellationToken = new CancellationTokenSource();
             using var host = CreateHostBuilder(args).Build();
             var backuper = host.Services.GetService<Backuper>();
-            await backuper.Run();
+
+            Console.CancelKeyPress += (sender, eventArgs) =>
+            {
+                Console.WriteLine("Cancel requested");
+                cancellationToken.Cancel();
+                eventArgs.Cancel = true;
+            };
+
+            await backuper.Run(cancellationToken);
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -37,6 +49,7 @@ namespace AzureStorageAutoBackup
                 services.AddTransient<FileUploader>();
                 services.AddTransient<IStorageReader, StorageService>();
                 services.AddTransient<IStorageCommand, StorageService>();
+                services.AddTransient<IMailSender, MailSender>();
                 services.AddTransient<Backuper>();
             });
     }

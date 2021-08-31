@@ -1,6 +1,7 @@
 ﻿using AzureStorageAutoBackup.AzureStorage;
 using FluentAssertions;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AzureStorageAutoBackup.Tests.Stubs
@@ -9,7 +10,7 @@ namespace AzureStorageAutoBackup.Tests.Stubs
     {
         public int Count { get; private set; } = 0;
 
-        public Task<List<FileItem>> BrowseStorage()
+        public Task<List<FileItem>> BrowseStorage(CancellationTokenSource cancellationTokenSource)
         {
             return Task.FromResult(new List<FileItem>
             {
@@ -21,24 +22,24 @@ namespace AzureStorageAutoBackup.Tests.Stubs
             });
         }
 
-        public Task CreateDirectories(List<string> directories)
+        public Task CreateDirectories(List<string> directories, CancellationTokenSource cancellationTokenSource)
         {
             directories.Count.Should().Be(1);
             return Task.CompletedTask;
         }
 
-        public Task DeleteEmptyDirectoriesIfExist()
+        public Task DeleteEmptyDirectoriesIfExist(CancellationTokenSource cancellationTokenSource)
         {
             return Task.CompletedTask;
         }
 
-        public Task DeleteFiles(List<string> filesToDelete)
+        public Task DeleteFiles(List<string> filesToDelete, CancellationTokenSource cancellationTokenSource)
         {
             filesToDelete.Count.Should().Be(1);
             return Task.CompletedTask;
         }
 
-        public Task UploadToStorage(FileItem file)
+        public Task UploadToStorage(FileItem file, CancellationTokenSource cancellationTokenSource)
         {
             Count++;
             return Task.CompletedTask;

@@ -9,5 +9,7 @@ namespace AzureStorageAutoBackup
         public string DestinationPathInAzure { get; set; }
         public string ConnectionString { get; set; }
         public string ShareReference { get; set; }
+        public string SendGridApiKey { get; set; }
+        public List<string> MailsTo { get; set; }
     }
 }

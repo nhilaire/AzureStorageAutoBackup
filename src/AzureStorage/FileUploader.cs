@@ -1,6 +1,9 @@
-﻿using AzureStorageAutoBackup.Files;
+﻿using Azure;
+using AzureStorageAutoBackup.Files;
 using AzureStorageAutoBackup.State;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -79,8 +82,19 @@ namespace AzureStorageAutoBackup.AzureStorage
                             }
                         }
                     }
-                    catch (IOException)
+                    catch (RequestFailedException ex)
                     {
+                        Console.WriteLine($"Request Erreur sur {file.Path} : {ex}");
+                        _applicationStat.FilesInErrors.Add(file.Path);
+                    }
+                    catch (IOException ex)
+                    {
+                        Console.WriteLine($"IO Erreur sur {file.Path} : {ex}");
+                        _applicationStat.FilesInErrors.Add(file.Path);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erreur inconnue sur {file.Path} : {ex.GetType()} / {ex}");
                         _applicationStat.FilesInErrors.Add(file.Path);
                     }
                 }
@@ -91,7 +105,7 @@ namespace AzureStorageAutoBackup.AzureStorage
 
         public async Task CleanFilesAndDirectories(List<FileItem> filesInStorage, List<FileItem> fileListToBackup, CancellationTokenSource cancellationToken)
         {
-            var filesToDeleteInStorage = filesInStorage.Select(x => x.Path).Except(fileListToBackup.Select(x => x.Path)).ToList();
+            var filesToDeleteInStorage = filesInStorage.Select(x => x.Path.ToLowerInvariant()).Except(fileListToBackup.Select(x => x.Path.ToLowerInvariant())).ToList();
             _logger.LogTrace($"Nb files to delete in storage : {filesToDeleteInStorage.Count}");
             await _storageCommand.DeleteFiles(filesToDeleteInStorage, cancellationToken);
 
@@ -100,8 +114,8 @@ namespace AzureStorageAutoBackup.AzureStorage
 
         private static List<string> ComputeMissingDirectories(List<FileItem> files, List<FileItem> existingFiles)
         {
-            var allDistinctDirectories = files.Select(x => GetDirectoriesWithParents(x.Path)).SelectMany(x => x).Distinct().ToList();
-            var existingDistinctDirectories = existingFiles.Select(x => GetDirectoriesWithParents(x.Path)).SelectMany(x => x).Distinct().ToList();
+            var allDistinctDirectories = files.Select(x => GetDirectoriesWithParents(x.Path)).SelectMany(x => x).Select(x => x.ToLowerInvariant()).Distinct().ToList();
+            var existingDistinctDirectories = existingFiles.Select(x => GetDirectoriesWithParents(x.Path)).SelectMany(x => x).Select(x => x.ToLowerInvariant()).Distinct().ToList();
             return allDistinctDirectories.Except(existingDistinctDirectories).ToList();
         }
 
@@ -112,11 +126,11 @@ namespace AzureStorageAutoBackup.AzureStorage
             var path = Path.GetDirectoryName(filePath);
             var directoryInfo = new DirectoryInfo(path);
 
-            result.Add(path);
+            result.Add(path.ToLowerInvariant());
             while (directoryInfo.Parent != null)
             {
                 directoryInfo = directoryInfo.Parent;
-                result.Add(directoryInfo.FullName);
+                result.Add(directoryInfo.FullName.ToLowerInvariant());
             }
 
             return result;

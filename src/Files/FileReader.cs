@@ -22,7 +22,7 @@ namespace AzureStorageAutoBackup.Files
 
         private async Task BrowseFiles(string path, List<FileItem> result)
         {
-            var files = new string[0];
+            var files = Array.Empty<string>();
             try
             {
                 files = Directory.GetFiles(path);
@@ -33,10 +33,10 @@ namespace AzureStorageAutoBackup.Files
 
             foreach (var file in files)
             {
-                result.Add(new FileItem { Path = file });
+                result.Add(new FileItem { Path = file.ToLowerInvariant() });
             }
 
-            var directories = new string[0];
+            var directories = Array.Empty<string>();
             try
             {
                 directories = Directory.GetDirectories(path);

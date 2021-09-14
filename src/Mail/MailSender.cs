@@ -37,7 +37,7 @@ Nb files already backuped : {_applicationStat.AlreadyBackupedCount}<br/>
 Nb new files : { _applicationStat.NewFilesCount}<br/>
 Nb updated files: { _applicationStat.UpdateFilesCount}<br/>
 Nb deleted files: { _applicationStat.DeleteFilesCount}<br/>
-Nb missing files : {_applicationStat.FilesToBackupCount - (_applicationStat.NewFilesCount + _applicationStat.NewFilesCount)}<br/>
+Nb missing files : {_applicationStat.FilesToBackupCount - (_applicationStat.NewFilesCount + _applicationStat.UpdateFilesCount)}<br/>
 Nb files in error : {_applicationStat.FilesInErrors.Count}<br/><br/>";
 
                 var msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent, htmlContent);

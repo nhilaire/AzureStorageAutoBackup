@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -43,7 +44,7 @@ namespace AzureStorageAutoBackup.Files
             }
             foreach (var excludedPath in _appConfiguration.ExcludedPaths)
             {
-                if (Path.GetDirectoryName(file).Contains(excludedPath))
+                if (Path.GetDirectoryName(file).Contains(excludedPath, StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }

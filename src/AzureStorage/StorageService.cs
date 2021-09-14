@@ -62,28 +62,31 @@ namespace AzureStorageAutoBackup.AzureStorage
 
         public async Task UploadToStorage(FileItem file, CancellationTokenSource cancellationToken)
         {
-            var baseDirectory = _shareClient.GetDirectoryClient(_appConfiguration.DestinationPathInAzure);
-            var azurePath = ToAzureNameWithoutBasePath(file.Path);
-            var fileClient = baseDirectory.GetFileClient(azurePath);
+            await Retry(async () =>
+            {
+                var baseDirectory = _shareClient.GetDirectoryClient(_appConfiguration.DestinationPathInAzure);
+                var azurePath = ToAzureNameWithoutBasePath(file.Path);
+                var fileClient = baseDirectory.GetFileClient(azurePath);
 
-            using (var stream = File.OpenRead(file.Path))
-            {
-                fileClient.Create(stream.Length);
-                try
+                using (var stream = File.OpenRead(file.Path))
                 {
-                    await UploadFileAsync(cancellationToken, fileClient, stream, $"{file.Path} : {file.State}");
+                    fileClient.Create(stream.Length);
+                    try
+                    {
+                        await UploadFileAsync(cancellationToken, fileClient, stream, $"{file.Path} : {file.State}");
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        return;
+                    }
                 }
-                catch (TaskCanceledException)
+                var metadata = new Dictionary<string, string>
                 {
-                    return;
-                }
-            }
-            var metadata = new Dictionary<string, string>
-            {
-                {customChecksumMetadataName, file.Checksum}
-            };
-            await fileClient.SetMetadataAsync(metadata);
-            await _filesState.Save(file);
+                    {customChecksumMetadataName, file.Checksum}
+                };
+                await fileClient.SetMetadataAsync(metadata);
+                await _filesState.Save(file);
+            }, 3);
         }
 
         private async Task UploadFileAsync(CancellationTokenSource cancellationToken, ShareFileClient fileClient, Stream stream, string fileNameAndState)
@@ -136,10 +139,17 @@ namespace AzureStorageAutoBackup.AzureStorage
                 }
 
                 var path = ToAzureNameWithoutBasePath(file);
-                _applicationStat.DeleteFilesCount++;
-                _logger.LogTrace($"Delete from azure storage {path}");
-                await baseDirectory.DeleteFileAsync(path);
-                await _filesState.Delete(file);
+                try
+                {
+                    _logger.LogTrace($"Delete from azure storage {path}");
+                    await baseDirectory.DeleteFileAsync(path);
+                    await _filesState.Delete(file);
+                    _applicationStat.DeleteFilesCount++;
+                }
+                catch (RequestFailedException ex)
+                {
+                    _logger.LogError($"Impossible de supprimer {path} : {ex}");
+                }
             }
         }
 
@@ -240,12 +250,12 @@ namespace AzureStorageAutoBackup.AzureStorage
 
         private static string ToAzureNameWithoutBasePath(string path)
         {
-            return path.Replace(":\\", "/").Replace('\\', '/');
+            return path.Replace(":\\", "/").Replace('\\', '/').ToLowerInvariant();
         }
 
         private string ToWindowsName(string directoryName, string itemName)
         {
-            if (directoryName.StartsWith(_appConfiguration.DestinationPathInAzure))
+            if (directoryName.StartsWith(_appConfiguration.DestinationPathInAzure, StringComparison.OrdinalIgnoreCase))
             {
                 directoryName = directoryName[_appConfiguration.DestinationPathInAzure.Length..];
             }
@@ -256,7 +266,24 @@ namespace AzureStorageAutoBackup.AzureStorage
             directoryName = directoryName.Replace("/", "\\");
             directoryName = directoryName.Insert(1, ":");
 
-            return $"{directoryName}\\{itemName}";
+            return $"{directoryName}\\{itemName}".ToLowerInvariant();
+        }
+
+        private async Task Retry(Func<Task> func, int retryCount)
+        {
+            while (true)
+            {
+                try
+                {
+                    await func();
+                    return;
+                }
+                catch (Exception ex) when (retryCount-- > 0) 
+                {
+                    _logger.LogTrace("Retrying ...");
+                    await Task.Delay(500);
+                }
+            }
         }
     }
 }

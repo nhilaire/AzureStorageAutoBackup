@@ -27,7 +27,7 @@ namespace AzureStorageAutoBackup.State
 
         public async Task Save(FileItem file)
         {
-            var existingFile = CompletedFiles.FirstOrDefault(x => x.Path == file.Path);
+            var existingFile = CompletedFiles.FirstOrDefault(x => string.Compare(x.Path, file.Path, true) == 0);
             if (existingFile == null)
             {
                 CompletedFiles.Add(file);
@@ -43,7 +43,7 @@ namespace AzureStorageAutoBackup.State
 
         public async Task Delete(string filePath)
         {
-            var existingFile = CompletedFiles.FirstOrDefault(x => x.Path == filePath);
+            var existingFile = CompletedFiles.FirstOrDefault(x => string.Compare(x.Path, filePath, true) == 0);
             if (existingFile != null)
             {
                 CompletedFiles.Remove(existingFile);

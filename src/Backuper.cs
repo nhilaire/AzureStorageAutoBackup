@@ -52,7 +52,7 @@ namespace AzureStorageAutoBackup
 Nb new files : {_applicationStat.NewFilesCount}
 Nb updated files : {_applicationStat.UpdateFilesCount}
 Nb deleted files : {_applicationStat.DeleteFilesCount}
-Nb missing files : {_applicationStat.FilesToBackupCount - (_applicationStat.NewFilesCount + _applicationStat.NewFilesCount)}
+Nb missing files : {_applicationStat.FilesToBackupCount - (_applicationStat.NewFilesCount + _applicationStat.UpdateFilesCount + _applicationStat.AlreadyBackupedCount)}
 Nb files in error : {_applicationStat.FilesInErrors.Count}");
 
                 await _mailSender.SendRecapMailWithSendGrid();
